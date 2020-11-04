@@ -18,7 +18,7 @@ namespace eosio { namespace chain { namespace backing_store {
       using session_type = eosio::session::session<eosio::session::session<eosio::session::rocksdb_t>>;
       using shared_bytes = eosio::session::shared_bytes;
 
-      db_context_rocksdb(apply_context& context, name receiver, session_type& session);
+      db_context_rocksdb(apply_context& context, const name& receiver, session_type& session);
 
       ~db_context_rocksdb() override;
 
@@ -162,7 +162,7 @@ namespace eosio { namespace chain { namespace backing_store {
       static constexpr uint64_t            noop_secondary = 0x0;
    }; // db_context_rocksdb
 
-   db_context_rocksdb::db_context_rocksdb(apply_context& context, name receiver, session_type& session)
+   db_context_rocksdb::db_context_rocksdb(apply_context& context, const name& receiver, session_type& session)
    : db_context( context, receiver ), current_session{ session }, primary_lookup(*this, session),
      sec_lookup_i64(*this, session), sec_lookup_i128(*this, session), sec_lookup_i256(*this, session),
      sec_lookup_double(*this, session), sec_lookup_long_double(*this, session) {}
@@ -750,7 +750,7 @@ namespace eosio { namespace chain { namespace backing_store {
       return primary_iter_store.add(primary_key_iter(table_ei, *primary_key, found_payer));
    }
 
-   std::unique_ptr<db_context> create_db_rocksdb_context(apply_context& context, name receiver,
+   std::unique_ptr<db_context> create_db_rocksdb_context(apply_context& context, const name& receiver,
                                                          db_context_rocksdb::session_type& session)
    {
       static_assert(std::is_convertible<db_context_rocksdb *, db_context *>::value, "cannot convert");

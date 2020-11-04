@@ -5,7 +5,7 @@
 namespace eosio { namespace chain { namespace backing_store {
 
    struct db_context_chainbase : db_context {
-      db_context_chainbase(apply_context& context, name receiver)
+      db_context_chainbase(apply_context& context, const name& receiver)
          : db_context( context, receiver ) {}
 
       int32_t db_store_i64(uint64_t scope, uint64_t table, account_name payer, uint64_t id, const char* buffer , size_t buffer_size) override {
@@ -289,7 +289,7 @@ namespace eosio { namespace chain { namespace backing_store {
       }
    }; // db_context_chainbase
 
-   std::unique_ptr<db_context> create_db_chainbase_context(apply_context& context, name receiver)
+   std::unique_ptr<db_context> create_db_chainbase_context(apply_context& context, const name& receiver)
    {
       return std::make_unique<db_context_chainbase>(context, receiver);
    }
