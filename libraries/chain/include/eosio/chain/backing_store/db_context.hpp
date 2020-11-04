@@ -20,7 +20,7 @@ namespace chain {
 
 namespace backing_store {
       struct db_context {
-         db_context(apply_context& c, name recv) : context(c), receiver(recv) {}
+         db_context(apply_context& c, const name& recv) : context(c), receiver(recv) {}
 
          virtual ~db_context() {}
 
@@ -208,7 +208,7 @@ namespace backing_store {
          static storage_usage_trace secondary_update_rem_trace(uint32_t action_id, std::string&& event_id);
          void update_db_usage(const account_name& payer, int64_t delta, const storage_usage_trace& trace);
          apply_context& context;
-         const name     receiver;
+         const name&    receiver;
       };
 
       std::unique_ptr<db_context> create_db_chainbase_context(apply_context& context, name receiver);
