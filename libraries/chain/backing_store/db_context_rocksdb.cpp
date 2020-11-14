@@ -218,10 +218,11 @@ namespace eosio { namespace chain { namespace backing_store {
          payer = old_payer;
       }
 
+      const payer_payload old_pp{*old_key_value.value};
+      const auto old_value_actual_size = old_pp.value_size;
+
       const payer_payload pp{payer, value, value_size};
       set_value(old_key_value.full_key, pp);
-
-      const auto old_value_actual_size = pp.value_size;
 
       std::string event_id;
       auto dm_logger = context.control.get_deep_mind_logger();
