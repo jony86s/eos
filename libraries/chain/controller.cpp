@@ -139,28 +139,21 @@ class manage_stack {
 public:
    using kv_undo_stack = eosio::session::undo_stack<rocks_db_type>;
    manage_stack(kv_undo_stack* undo_stack) : kv_undo_stack_(undo_stack) {
-      ilog("REM  manage stack");
       // Get a session to iterate over.
       if (kv_undo_stack_) {
-         ilog("REM  PUSH");
          kv_undo_stack_->push();
-         ilog("REM  PUSH done");
       }
    }
    void squash() {
       if (kv_undo_stack_) {
-         ilog("REM  SQUASH");
          kv_undo_stack_->squash();
          kv_undo_stack_ = nullptr;
-         ilog("REM  SQUASH done");
       }
    }
 
    ~manage_stack(){
       if (kv_undo_stack_) {
-         ilog("REM  UNDO");
          kv_undo_stack_->undo();
-         ilog("REM  UNDO done");
       }
    }
 private:
