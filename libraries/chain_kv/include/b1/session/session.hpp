@@ -446,8 +446,8 @@ session<Parent>::update_iterator_cache_(const shared_bytes& key, bool deleted, b
                m_parent);
       }
 
-      return it;
    }
+   return it;
 }
 
 template <typename Parent>
