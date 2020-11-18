@@ -52,6 +52,10 @@ apply_context::apply_context(controller& con, transaction_context& trx_ctx, uint
    receiver = trace.receiver;
    context_free = trace.context_free;
    _db_context = control.kv_db().create_db_context(*this, receiver);
+   if (act->name == name{"dicep"}.to_uint64_t()) {
+      // ilog("REM found dicep");
+      // _db_context->debug = true;
+   }
 }
 
 template <typename Exception>
@@ -223,6 +227,10 @@ void apply_context::exec()
    for( uint32_t i = 1; i < _notified.size(); ++i ) {
       std::tie( receiver, action_ordinal ) = _notified[i];
       _db_context->receiver = receiver;
+      if (receiver == name{"thedeosgames"}) {
+         // ilog("REM turn on debug");
+         // _db_context->debug = true;
+      }
       exec_one();
       increment_action_id();
    }
@@ -697,7 +705,6 @@ bool apply_context::cancel_deferred_transaction( const uint128_t& sender_id, acc
             ("trx", control.maybe_to_variant_with_abi(dtrx, abi_serializer::create_yield_function(control.get_abi_serializer_max_time())))
          );
       }
-
       add_ram_usage( gto->payer, -(config::billable_size_v<generated_transaction_object> + gto->packed_trx.size()), storage_usage_trace(get_action_id(), std::move(event_id), "deferred_trx", "cancel", "deferred_trx_cancel") );
       generated_transaction_idx.remove(*gto);
    }
@@ -1022,16 +1029,20 @@ int apply_context::db_previous_i64_chainbase( int iterator, uint64_t& primary ) 
 
 int apply_context::db_find_i64_chainbase( name code, name scope, name table, uint64_t id ) {
    //require_read_lock( code, scope ); // redundant?
+   _db_context->set_debug(code, scope, table, id);
 
    const auto* tab = find_table( code, scope, table );
    if( !tab ) return -1;
 
    auto table_end_itr = db_iter_store.cache_table( *tab );
+   if(_db_context->debug) ilog("REM code: ${c}, scope: ${s}, table: ${t}, id: ${i}, end: ${e}",("c",code.to_string())("s",scope.to_string())("t",table.to_string())("i",name{id}.to_string())("e",table_end_itr));
 
    const key_value_object* obj = db.find<key_value_object, by_scope_primary>( boost::make_tuple( tab->id, id ) );
    if( !obj ) return table_end_itr;
 
-   return db_iter_store.add( *obj );
+   auto ret = db_iter_store.add( *obj );
+   if(_db_context->debug) ilog("REM ret: ${ret}",("ret",ret));
+   return ret;
 }
 
 int apply_context::db_lowerbound_i64_chainbase( name code, name scope, name table, uint64_t id ) {

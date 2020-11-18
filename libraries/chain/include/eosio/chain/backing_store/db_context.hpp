@@ -20,9 +20,12 @@ namespace chain {
 
 namespace backing_store {
       struct db_context {
+         bool debug = false;
+         void set_debug(name code, name scope, name table, uint64_t id);
+         
          db_context(apply_context& c, name recv) : context(c), receiver(recv) {}
 
-         virtual ~db_context() {}
+         virtual ~db_context() { if (debug) ilog("REM done with debug"); }
 
          virtual int32_t db_store_i64(uint64_t scope, uint64_t table, account_name payer, uint64_t id, const char* buffer , size_t buffer_size) = 0;
 

@@ -30,6 +30,145 @@ class session {
    struct session_impl;
 
  public:
+   mutable bool debug = false;
+   void set_debug(bool d) const {
+      if (debug != d) {
+         debug = d;
+         std::visit(overloaded{ [&](session<Parent>* p) {
+                                 p->set_debug(debug);
+                              },
+                              [&](Parent* p) {
+                                 p->debug = debug;
+                              } },
+              m_parent);
+      }
+   };
+   template<typename Key>
+   bool is_special_key(const Key& key) const {
+      const static std::vector<char> the_one = {
+//         static_cast<char>(0x12), static_cast<char>(0xcb), static_cast<char>(0x54), static_cast<char>(0x95), static_cast<char>(0x53), static_cast<char>(0x0c), static_cast<char>(0x34), static_cast<char>(0x95), static_cast<char>(0x80), static_cast<char>(0xcb), static_cast<char>(0x54), static_cast<char>(0x95), static_cast<char>(0x53), static_cast<char>(0x0c), static_cast<char>(0x34), static_cast<char>(0x95), static_cast<char>(0x80), static_cast<char>(0x4b), static_cast<char>(0x90), static_cast<char>(0xa6), static_cast<char>(0x1a), static_cast<char>(0x4a), static_cast<char>(0xc0), static_cast<char>(0x00), static_cast<char>(0x00), static_cast<char>(0x00), static_cast<char>(0x00), static_cast<char>(0x00), static_cast<char>(0x00), static_cast<char>(0x00), static_cast<char>(0x00), static_cast<char>(0x02), static_cast<char>(0x52)
+//         static_cast<char>(0x12), static_cast<char>(0xcb), static_cast<char>(0x54), static_cast<char>(0x95), static_cast<char>(0x53), static_cast<char>(0x0c), static_cast<char>(0x34), static_cast<char>(0x95), static_cast<char>(0x80), static_cast<char>(0xcb), static_cast<char>(0x54), static_cast<char>(0x95), static_cast<char>(0x53), static_cast<char>(0x0c), static_cast<char>(0x34), static_cast<char>(0x95), static_cast<char>(0x80), static_cast<char>(0x4b), static_cast<char>(0x90), static_cast<char>(0xa6), static_cast<char>(0x1a), static_cast<char>(0x4a), static_cast<char>(0xc0)
+         static_cast<char>(0xff), static_cast<char>(0xcb), static_cast<char>(0x54), static_cast<char>(0x95), static_cast<char>(0x53), static_cast<char>(0x0c), static_cast<char>(0x34), static_cast<char>(0x95), static_cast<char>(0x80), static_cast<char>(0xcb), static_cast<char>(0x54), static_cast<char>(0x95), static_cast<char>(0x53), static_cast<char>(0x0c), static_cast<char>(0x34), static_cast<char>(0x95), static_cast<char>(0x80), static_cast<char>(0x4b), static_cast<char>(0x90), static_cast<char>(0xa6), static_cast<char>(0x1a), static_cast<char>(0x4a), static_cast<char>(0xc0)
+      };
+      if (key.size() < the_one.size())
+         return false;
+      for(unsigned int i = 0; i < key.size(); ++i) {
+         if (key[i] != the_one[i])
+            return false;
+      }
+      return true;
+   }
+   template<typename Key>
+   void special_key(const Key& key) const {
+      if (!debug) {
+         const bool spec = is_special_key(key);
+         if (!spec)
+            return;
+         ilog("REM  !!! found special !!!");
+         set_debug(true);
+      }
+   }
+   template<typename Key>
+   void key_to_buf(const Key& key, char* buf_ptr) const {
+      if (!debug)
+         return;
+      unsigned i = 0;
+      for (; i < key.size(); ++i) {
+         const auto count = sprintf(buf_ptr, "%02x", (uint8_t)key[i]);
+         buf_ptr += count;
+      }
+      *buf_ptr = '\0';
+   };
+   void print_buf(const char* desc, const char* buffer) const {
+      if (!debug)
+         return;
+      std::string padding;
+      char buffer2[500];
+      sprintf(buffer2,"%-40s", desc);
+      ilog("REM ${desc}: ${s}",("desc",buffer2)("s",buffer));
+   };
+   template<typename Key1, typename Key2>
+   void compare(const Key1& lhs, const Key2& rhs, const char* desc) const {
+      auto size = lhs.size();
+      if (rhs.size() > size) {
+         size = rhs.size();
+      }
+      if (debug) {
+         int32_t cmp = std::memcmp(lhs.data(), rhs.data(), std::min(lhs.size(), rhs.size()));
+         const auto temp1 = cmp > 0;
+         const auto temp2 = cmp == 0;
+         const auto temp3 = lhs.size() >= rhs.size();
+         const auto temp4 = cmp == 0 && lhs.size() >= rhs.size();
+         const auto gte = cmp > 0 || (cmp == 0 && lhs.size() >= rhs.size());
+         ilog("REM cmp: ${cmp}, cmp>0: ${temp1}, cmp==0: ${temp2}, lhs.size()>=rhs.size(): ${temp3}, cmp==0 && size()>=rhs.size(): ${temp4}, gte: ${gte}",("cmp",cmp)("temp1",temp1)("temp2",temp2)("temp3",temp3)("temp4",temp4)("gte",gte));
+      }
+      char buffer1[500];
+      char* buf_ptr1 = buffer1;
+      char buffer2[500];
+      char* buf_ptr2 = buffer2;
+      bool equal = true;
+      auto add_comp = [](auto lhs, auto rhs, char*& buf_ptr) {
+         const char* desc = "greater";
+         if (lhs < rhs) {
+            desc = "lesser";
+         }
+         const auto count = sprintf(buf_ptr, " -- %s", desc);
+         buf_ptr += count;
+      };
+      for(unsigned int i = 0; i < size; ++i) {
+         const auto count = sprintf(buf_ptr1, "%02x", (uint8_t)lhs[i]);
+         buf_ptr1 += count;
+         sprintf(buf_ptr2, "%02x", (uint8_t)rhs[i]);
+         buf_ptr2 += count;
+         const auto l = static_cast<unsigned char>(lhs[i]);
+         const auto r = static_cast<unsigned char>(rhs[i]);
+         if (l != r) {
+            equal = false;
+            add_comp(l, r, buf_ptr1);
+            break;
+         }
+      }
+      if (equal && lhs.size() != rhs.size()) {
+         add_comp(lhs.size(), rhs.size(), buf_ptr1);
+         equal = false;
+      }
+      *buf_ptr1 = '\0';
+      *buf_ptr2 = '\0';
+      if (!equal) {
+         print_buf(desc, "compare !=");
+         print_buf("compare lhs", buffer1);
+         print_buf("compare rhs", buffer2);
+      } else {
+         print_buf(desc, "compare ==");
+      }
+   }
+   template<typename Key>
+   void print_key(const Key& key, const char* desc) const {
+      special_key(key);
+      if (!debug)
+         return;
+      char buffer[500];
+      key_to_buf(key, buffer);
+      print_buf(desc, buffer);
+   };
+   template<typename Iter1, typename Iter2>
+   void print_iter(const Iter1& iter, const char* desc, const Iter2& end) const {
+      const bool at_end = iter == end;
+      if (!at_end)
+         special_key(iter->first);
+      if (!debug)
+         return;
+      if (at_end) {
+         print_buf(desc, "<end iterator>");
+         return;
+      }
+      const bool spec = true;
+      //const bool spec = is_special_key(iter->first);
+      print_key(iter->first, desc);
+      if (spec) {
+         ilog("REM previous: ${prev}, next: ${next}",("prev", iter->second.previous_in_cache)("next", iter->second.next_in_cache));
+      }
+   };
    struct iterator_state {
       bool     next_in_cache{ false };
       bool     previous_in_cache{ false };
@@ -214,11 +353,16 @@ void session<Parent>::prime_cache_() {
                           } },
               m_parent);
 
+   if (debug) ilog("REM session cache: ${s}",("s", m_iterator_cache.size()));
    if (lower_key) {
-      m_iterator_cache.emplace(lower_key, iterator_state{});
+      auto temp = m_iterator_cache.emplace(lower_key, iterator_state{});
+      print_iter(temp.first,"prime_cache_ lower", std::end(m_iterator_cache));
+      if (debug) ilog("REM ${d}",("d", (temp.second ? "added" : "existed")));
    }
    if (upper_key) {
-      m_iterator_cache.emplace(upper_key, iterator_state{});
+      auto temp = m_iterator_cache.emplace(upper_key, iterator_state{});
+      print_iter(temp.first,"prime_cache_ upper", std::end(m_iterator_cache));
+      if (debug) ilog("REM ${d}",("d", (temp.second ? "added" : "existed")));
    }
 }
 
@@ -228,15 +372,20 @@ void session<Parent>::clear() {
    m_updated_keys.clear();
    m_cache.clear();
    m_iterator_cache.clear();
+   if (debug) ilog("REM session clear cache");
 }
 
 template <typename Parent>
 session<Parent>::session(Parent& parent) : m_parent{ &parent } {
+   if (parent.debug)
+     this->debug = true;
    attach(parent);
 }
 
 template <typename Parent>
 session<Parent>::session(session& parent) : m_parent{ &parent } {
+   if (parent.debug)
+     this->debug = true;
    attach(parent);
 }
 
@@ -245,6 +394,7 @@ session<Parent>::session(session&& other)
     : m_parent{ std::move(other.m_parent) }, m_cache{ std::move(other.m_cache) }, m_iterator_cache{ std::move(
                                                                                         other.m_iterator_cache) },
       m_updated_keys{ std::move(other.m_updated_keys) }, m_deleted_keys{ std::move(other.m_deleted_keys) } {
+   debug = other.debug;
    session* null_parent = nullptr;
    other.m_parent       = null_parent;
 }
@@ -263,6 +413,7 @@ session<Parent>& session<Parent>::operator=(session&& other) {
 
    session* null_parent = nullptr;
    other.m_parent       = null_parent;
+   debug = other.debug;
 
    return *this;
 }
@@ -283,29 +434,40 @@ template <typename Parent>
 template <typename It, typename Parent_it>
 void session<Parent>::previous_key_(It& it, Parent_it& pit, Parent_it& pbegin, Parent_it& pend) const {
    if (it->first) {
+      print_iter(it, "previous_key_ start", std::end(m_iterator_cache));
+      print_key(pit.key(), "previous_key_ parent start");
       if (pit != pbegin) {
          size_t decrement_count = 0;
          while (pit.key() >= it->first) {
+            compare(pit.key(), it->first, "previous_key_ compare");
             --pit;
+            print_key(pit.key(), "previous_key_ parent decremented");
             ++decrement_count;
             if (pit == pend) {
                break;
             }
          }
+         compare(pit.key(), it->first, "previous_key_ compare lhs selected");
 
          if (pit != pend) {
-            m_iterator_cache.emplace(pit.key(), iterator_state{});
+            auto temp = m_iterator_cache.emplace(pit.key(), iterator_state{});
+            print_iter(temp.first, ( temp.second ? "previous_key_ added parent to cache" :  "previous_key_ NOT added parent to cache"), std::end(m_iterator_cache));
          }
 
          for (size_t i = 0; i < decrement_count; ++i) { ++pit; }
+      } else {
+         print_buf("previous_key_ parent start is pbegin","");
       }
 
       auto& it_cache = const_cast<iterator_cache_type&>(m_iterator_cache);
       auto  lower_it = it_cache.lower_bound(it->first);
       if (lower_it != std::begin(it_cache)) {
+         print_iter(lower_it, "previous_key_ lower_bound", std::end(m_iterator_cache));
          --lower_it;
          lower_it->second.next_in_cache = true;
+         print_iter(lower_it, "previous_key_ result set start previous and this next", std::end(m_iterator_cache));
          it->second.previous_in_cache   = true;
+         print_iter(it, "previous_key_ set previous", std::end(m_iterator_cache));
       }
    }
 }
@@ -314,13 +476,17 @@ template <typename Parent>
 template <typename It, typename Parent_it>
 void session<Parent>::next_key_(It& it, Parent_it& pit, Parent_it& pend) const {
    if (it->first) {
+      print_iter(it, "next_key_ start", std::end(m_iterator_cache));
       bool decrement = false;
+      print_key(pit.key(), "next_key_ parent start");
       if (pit.key() == it->first) {
          ++pit;
+         print_iter(it, "next_key_ parent next", std::end(m_iterator_cache));
          decrement = true;
       }
       if (pit != pend) {
-         m_iterator_cache.emplace(pit.key(), iterator_state{});
+         auto temp = m_iterator_cache.emplace(pit.key(), iterator_state{});
+         print_iter(temp.first, (temp.second ? "next_key_ added parent to cache" : "next_key_ NOT added parent to cache"), std::end(m_iterator_cache));
       }
       if (decrement) {
          --pit;
@@ -330,12 +496,14 @@ void session<Parent>::next_key_(It& it, Parent_it& pit, Parent_it& pend) const {
       auto  lower_it = it_cache.lower_bound(it->first);
       auto  end      = std::end(it_cache);
       if (lower_it != end) {
+         print_iter(lower_it, "next_key_ lower_bound", std::end(m_iterator_cache));
          if ((*lower_it).first == it->first) {
             ++lower_it;
          }
          if (lower_it != end) {
             lower_it->second.previous_in_cache = true;
             it->second.next_in_cache           = true;
+            print_iter(lower_it, "next_key_ start's next and this previous set true", std::end(m_iterator_cache));
          }
       }
    }
@@ -365,6 +533,7 @@ void session<Parent>::attach(session& parent) {
 
 template <typename Parent>
 void session<Parent>::detach() {
+   if (debug) ilog("REM session detatch parent");
    session* null_parent = nullptr;
    m_parent             = null_parent;
 }
@@ -397,21 +566,30 @@ typename session<Parent>::iterator_traits::iterator_cache_iterator
 session<Parent>::update_iterator_cache_(const shared_bytes& key, bool deleted, bool overwrite) const {
    auto  result = m_iterator_cache.emplace(key, iterator_state{});
    auto& it     = result.first;
+   const bool orig_debug = debug;
+   if (debug) ilog("REM update_iterator_cache_ size: ${s}", ("s", m_iterator_cache.size()));
 
    if (overwrite) {
       it->second.deleted = deleted;
       if (deleted) {
+         print_iter(it, "update_iterator_cache_ deleted", std::end(m_iterator_cache));
          ++it->second.version;
       }
    }
+   if (debug) ilog("REM update_iterator_cache_ size: ${s}", ("s", m_iterator_cache.size()));
+
+   print_key(key, "update_iterator_cache_ passed in key");
 
    if (result.second) {
       // The two keys that this new key is being inserted inbetween may have been contiguous in the global order.
       // If so, that means we already know the global order of this new key.
+      print_iter(it, "update_iterator_cache_ start", std::end(m_iterator_cache));
       if (it != std::begin(m_iterator_cache)) {
          auto previous = it;
          --previous;
+         print_iter(previous, "update_iterator_cache_ previous", std::end(m_iterator_cache));
          if (previous->second.next_in_cache) {
+            print_buf("setting start's previous and next","");
             it->second.previous_in_cache = true;
             it->second.next_in_cache     = true;
             return it;
@@ -422,7 +600,9 @@ session<Parent>::update_iterator_cache_(const shared_bytes& key, bool deleted, b
          if (it != end) {
             auto next = it;
             ++next;
+            print_iter(next, "update_iterator_cache_ next", std::end(m_iterator_cache));
             if (next != end && next->second.previous_in_cache) {
+               print_buf("setting start's previous and next","");
                it->second.next_in_cache     = true;
                it->second.previous_in_cache = true;
                return it;
@@ -446,7 +626,14 @@ session<Parent>::update_iterator_cache_(const shared_bytes& key, bool deleted, b
                m_parent);
       }
 
+   } else {
+      print_iter(it, "update_iterator_cache_ not added", std::end(m_iterator_cache));
    }
+   if (orig_debug && !debug) {
+      print_key(key, "update_iterator_cache_ passed in key");
+   }
+   if (debug) ilog("REM now update_iterator_cache_ size: ${s}", ("s", m_iterator_cache.size()));
+
    return it;
 }
 
@@ -455,6 +642,7 @@ std::optional<shared_bytes> session<Parent>::read(const shared_bytes& key) const
    // Find the key within the session.
    // Check this level first and then traverse up to the parent to see if this key/value
    // has been read and/or update.
+   print_key(key, "read");
    if (m_deleted_keys.find(key) != std::end(m_deleted_keys)) {
       // key has been deleted at this level.
       return {};
@@ -486,6 +674,7 @@ void session<Parent>::write(const shared_bytes& key, const shared_bytes& value) 
    m_updated_keys.emplace(key);
    m_deleted_keys.erase(key);
    m_cache.write(key, value);
+   print_key(key, "write");
    auto it            = update_iterator_cache_(key, false, true);
    it->second.deleted = false;
 }
@@ -495,6 +684,7 @@ bool session<Parent>::contains(const shared_bytes& key) const {
    // Traverse the heirarchy to see if this session (and its parent session)
    // has already read the key into memory.
 
+   print_key(key, "contains");
    if (m_deleted_keys.find(key) != std::end(m_deleted_keys)) {
       return false;
    }
@@ -518,6 +708,7 @@ void session<Parent>::erase(const shared_bytes& key) {
    m_deleted_keys.emplace(key);
    m_updated_keys.erase(key);
    m_cache.erase(key);
+   print_key(key, "erase");
    auto it            = update_iterator_cache_(key, true, true);
    it->second.deleted = true;
 }
@@ -595,11 +786,15 @@ It& session<Parent>::first_not_deleted_in_iterator_cache_(It& it, const It& end,
       if (previous_known) {
          previous_known = it->second.previous_in_cache;
       }
+      if(debug) ilog("REM previous_known: ${p}",("p", previous_known));
    };
    while (it != end && it->second.deleted) {
+      print_iter(it, "find not deleted", std::end(m_iterator_cache));
       update_previous_flag(it);
       ++it;
    }
+   if(it != end)
+      print_iter(it, "found not deleted", std::end(m_iterator_cache));
    update_previous_flag(it);
    previous_in_cache = previous_known;
    return it;
@@ -610,11 +805,14 @@ template <typename It>
 It& session<Parent>::first_not_deleted_in_iterator_cache_(It& it, const It& end) const {
    while (it != end) {
       auto find_it = m_iterator_cache.find(it.key());
+      if (find_it != std::end(m_iterator_cache))
+         print_iter(find_it, "checking cache", std::end(m_iterator_cache));
       if (find_it == std::end(m_iterator_cache) || !find_it->second.deleted) {
          return it;
       }
       ++it;
    }
+   if(debug) ilog("REM reached end");
 
    return it;
 }
@@ -631,14 +829,17 @@ typename session<Parent>::iterator session<Parent>::find(const shared_bytes& key
                auto pit = p->find(key);
                if (pit != std::end(*p)) {
                   it = it_cache.emplace(key, iterator_state{}).first;
+                  print_iter(it, "found in parent", std::end(m_iterator_cache));
                }
             },
             m_parent);
    }
 
    if (it != end) {
+      print_iter(it, "found", std::end(m_iterator_cache));
       version = it->second.version;
       if (it->second.deleted) {
+         if (debug) ilog("REM but deleted");
          it = std::move(end);
       }
    }
@@ -654,8 +855,9 @@ typename session<Parent>::iterator session<Parent>::begin() const {
    auto  version  = uint64_t{ 0 };
 
    bool previous_in_cache = true;
+   print_iter(it, "begin start", end);
    first_not_deleted_in_iterator_cache_(it, end, previous_in_cache);
-   if ((it != end) || (it != begin && !previous_in_cache)) {
+   if ((it == end) || (it != begin && !previous_in_cache)) {
       // We have a begin iterator in this session, but we don't have enough
       // information to determine if that iterator is globally the begin iterator.
       // We need to ask the parent for its begin iterator and compare the two
@@ -663,15 +865,26 @@ typename session<Parent>::iterator session<Parent>::begin() const {
       auto pending_key = shared_bytes{};
       if (it != end) {
          pending_key = (*it).first;
+         print_key(pending_key, "pending_key");
       }
       std::visit(
             [&](auto* p) {
                auto pit  = std::begin(*p);
                auto pend = std::end(*p);
+               print_key(pit.key(), "pit start");
                first_not_deleted_in_iterator_cache_(pit, pend);
                if (pit != pend) {
+                  print_key(pit.key(), "pit skip deletes");
                   if (!pending_key || pit.key() < pending_key) {
-                     it = it_cache.emplace(pit.key(), iterator_state{}).first;
+                     auto temp = it_cache.emplace(pit.key(), iterator_state{});
+                     it = temp.first;
+                     print_iter(it, "pit instead of pending_key", end);
+                     if (debug) {
+                        if (temp.second)
+                           ilog("REM added pit");
+                        else
+                           ilog("REM pit existed");
+                     }
                   }
                }
             },
@@ -697,6 +910,9 @@ typename session<Parent>::iterator session<Parent>::lower_bound(const shared_byt
    auto  end      = std::end(it_cache);
    auto  it       = it_cache.lower_bound(key);
 
+   if (it != end)
+      print_iter(it, "first one", end);
+
    bool previous_in_cache = true;
    first_not_deleted_in_iterator_cache_(it, end, previous_in_cache);
    if (it == end || ((*it).first != key && !previous_in_cache)) {
@@ -707,6 +923,7 @@ typename session<Parent>::iterator session<Parent>::lower_bound(const shared_byt
       auto pending_key = shared_bytes{};
       if (it != end) {
          pending_key = (*it).first;
+         print_key(pending_key, "pending_key");
       }
       std::visit(
             [&](auto* p) {
@@ -714,8 +931,13 @@ typename session<Parent>::iterator session<Parent>::lower_bound(const shared_byt
                auto pend = std::end(*p);
                first_not_deleted_in_iterator_cache_(pit, pend);
                if (pit != pend) {
+                  if(pending_key) print_key(pending_key, "pending_key");
+                  print_key(pit.key(), "pit.key");
                   if (!pending_key || pit.key() < pending_key) {
-                     it = it_cache.emplace(pit.key(), iterator_state{}).first;
+                     print_buf("using parent's key", "");
+                     auto temp = it_cache.emplace(pit.key(), iterator_state{});
+                     it = temp.first;
+                     print_iter(it, (temp.second ? "added parent's key" : "parent's key existed"), end);
                   }
                }
             },
@@ -724,6 +946,7 @@ typename session<Parent>::iterator session<Parent>::lower_bound(const shared_byt
    if (it != end) {
       version = it->second.version;
       if (it->second.deleted) {
+         print_iter(it, "deleting", end);
          it = std::move(end);
       }
    }
@@ -772,18 +995,23 @@ void session<Parent>::session_iterator<Iterator_traits>::move_next_() {
       auto pending_key = eosio::session::shared_bytes{};
       auto end         = std::end(m_active_session->m_iterator_cache);
       if (it != end) {
+         m_active_session->print_iter(it, "starting key", end);
          ++it;
          if (it != end) {
             pending_key = it->first;
+            m_active_session->print_iter(it, "pending_key", end);
          }
          --it;
+         m_active_session->print_iter(it, "starting key", end);
       }
 
       auto key = std::visit(
-            [&](auto* p) {
+            [&, session=m_active_session](auto* p) {
                auto pit = p->lower_bound(it->first);
+               session->print_key(pit.key(), "next pit");
                if (pit != std::end(*p) && pit.key() == it->first) {
                   ++pit;
+                  session->print_key(pit.key(), "next pit incremented");
                }
                return pit.key();
             },
@@ -793,14 +1021,24 @@ void session<Parent>::session_iterator<Iterator_traits>::move_next_() {
       // 1. The next key in order in this sessions cache.
       // 2. The next key in lexicographical order retrieved from the sessions parent.
       // Choose which one it is.
+      m_active_session->print_key(key,"instead of pending_key");
       if (pending_key && pending_key < key) {
          key = pending_key;
+         m_active_session->print_key(key,"chose pending_key");
       }
 
       if (key) {
          auto nit                            = m_active_session->m_iterator_cache.emplace(key, iterator_state{});
+         if (m_active_session->debug) {
+            if (!nit.second) {
+               m_active_session->print_iter(nit.first, "updating set starting key next and this prev", std::end(m_active_session->m_iterator_cache));
+            } else {
+               m_active_session->print_iter(nit.first, "adding set starting key next and this prev", std::end(m_active_session->m_iterator_cache));
+            }
+         }
          nit.first->second.previous_in_cache = true;
          it->second.next_in_cache            = true;
+         m_active_session->print_iter(nit.first, "now", std::end(m_active_session->m_iterator_cache));
          return true;
       }
       return false;
@@ -826,19 +1064,27 @@ void session<Parent>::session_iterator<Iterator_traits>::move_previous_() {
    auto update_cache = [&](auto& it) mutable {
       auto pending_key = eosio::session::shared_bytes{};
       if (it != std::begin(m_active_session->m_iterator_cache)) {
+         m_active_session->print_iter(it, "starting key", std::end(m_active_session->m_iterator_cache));
          --it;
          pending_key = it->first;
+         m_active_session->print_iter(it, "pending_key", std::end(m_active_session->m_iterator_cache));
          ++it;
+         m_active_session->print_iter(it, "starting key", std::end(m_active_session->m_iterator_cache));
       }
 
       auto key = std::visit(
-            [&](auto* p) {
+            [&,session=m_active_session](auto* p) {
                auto pit = p->lower_bound(it->first);
                if (pit != std::begin(*p)) {
+                  if (pit != std::end(*p))
+                     session->print_key(pit.key(), "pit");
                   --pit;
                } else {
+                  session->print_buf("no pit", "");
                   return eosio::session::shared_bytes{};
                }
+               if (pit != std::end(*p))
+                  session->print_key(pit.key(), "pit key");
                return pit.key();
             },
             m_active_session->m_parent);
@@ -849,13 +1095,25 @@ void session<Parent>::session_iterator<Iterator_traits>::move_previous_() {
       // We want the larger of the two.
       if (pending_key && pending_key > key) {
          key = pending_key;
+         m_active_session->print_key(key,"chose pending");
       }
 
       if (key) {
          auto nit                        = m_active_session->m_iterator_cache.emplace(key, iterator_state{});
+         if (m_active_session->debug) {
+            if (!nit.second) {
+               m_active_session->print_iter(nit.first, "updating  set starting key previous and this next", std::end(m_active_session->m_iterator_cache));
+               ilog("REM was next's prev: ${p}, and next: ${n}",("p",it->second.previous_in_cache)("n",nit.first->second.next_in_cache));
+            } else {
+               m_active_session->print_iter(nit.first, "adding  set starting key previous and this next", std::end(m_active_session->m_iterator_cache));
+            }
+         }
          nit.first->second.next_in_cache = true;
          it->second.previous_in_cache    = true;
          return true;
+      }
+      else {
+         m_active_session->print_buf("no key","");
       }
       return false;
    };

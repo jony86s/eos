@@ -23,6 +23,7 @@ struct rocksdb_t {};
 template <>
 class session<rocksdb_t> {
  public:
+   mutable bool debug = false;
    template <typename Parent>
    friend class session;
 

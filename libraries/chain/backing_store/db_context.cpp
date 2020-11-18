@@ -3,6 +3,13 @@
 #include <eosio/chain/backing_store/db_context.hpp>
 
 namespace eosio { namespace chain { namespace backing_store {
+void db_context::set_debug(name code, name scope, name table, uint64_t id) {
+  if(code == name{"thedeosgames"} && table == name{"dicegames"} && id == name{".........dd53"}.to_uint64_t()) {
+     ilog("REM set debug");
+     debug = true;
+  }
+    
+}
 
 std::string db_context::table_event(name code, name scope, name table) {
    return STORAGE_EVENT_ID("${code}:${scope}:${table}",

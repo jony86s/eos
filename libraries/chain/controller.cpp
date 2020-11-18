@@ -141,11 +141,13 @@ public:
    manage_stack(kv_undo_stack* undo_stack) : kv_undo_stack_(undo_stack) {
       // Get a session to iterate over.
       if (kv_undo_stack_) {
+         ilog("REM push stack  >>>>>>>>");
          kv_undo_stack_->push();
       }
    }
    void squash() {
       if (kv_undo_stack_) {
+         ilog("REM squash stack  <<<<<<");
          kv_undo_stack_->squash();
          kv_undo_stack_ = nullptr;
       }
