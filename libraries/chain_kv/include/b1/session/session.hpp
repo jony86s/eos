@@ -655,7 +655,7 @@ typename session<Parent>::iterator session<Parent>::begin() const {
 
    bool previous_in_cache = true;
    first_not_deleted_in_iterator_cache_(it, end, previous_in_cache);
-   if ((it != end) || (it != begin && !previous_in_cache)) {
+   if ((it == end) || (it != begin && !previous_in_cache)) {
       // We have a begin iterator in this session, but we don't have enough
       // information to determine if that iterator is globally the begin iterator.
       // We need to ask the parent for its begin iterator and compare the two
