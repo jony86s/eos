@@ -200,7 +200,7 @@ inline bool shared_bytes::operator<(const shared_bytes& other) const {
    }
 
    int32_t cmp = std::memcmp(data(), other.data(), std::min(size(), other.size()));
-   return (cmp == 0 && size() < other.size()) || cmp < 0;
+   return cmp < 0 || (cmp == 0 && size() < other.size());
 }
 
 inline bool shared_bytes::operator<=(const shared_bytes& other) const {
@@ -209,7 +209,7 @@ inline bool shared_bytes::operator<=(const shared_bytes& other) const {
    }
 
    int32_t cmp = std::memcmp(data(), other.data(), std::min(size(), other.size()));
-   return cmp <= 0 && size() <= other.size();
+   return cmp < 0 || (cmp == 0 && size() <= other.size());
 }
 
 inline bool shared_bytes::operator>(const shared_bytes& other) const {
@@ -218,7 +218,7 @@ inline bool shared_bytes::operator>(const shared_bytes& other) const {
    }
 
    int32_t cmp = std::memcmp(data(), other.data(), std::min(size(), other.size()));
-   return (cmp == 0 && size() > other.size()) || cmp > 0;
+   return cmp > 0 || (cmp == 0 && size() > other.size());
 }
 
 inline bool shared_bytes::operator>=(const shared_bytes& other) const {
@@ -227,7 +227,7 @@ inline bool shared_bytes::operator>=(const shared_bytes& other) const {
    }
 
    int32_t cmp = std::memcmp(data(), other.data(), std::min(size(), other.size()));
-   return cmp >= 0 && size() >= other.size();
+   return cmp > 0 || (cmp == 0 && size() >= other.size());
 }
 
 inline bool shared_bytes::operator!() const { return *this == shared_bytes{}; }
