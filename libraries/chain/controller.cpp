@@ -448,7 +448,8 @@ struct controller_impl {
                replay_push_block( std::move(next), controller::block_status::irreversible );
                ms.squash();
                if( check_shutdown() ) break;
-               if( block_num % 500 == 0 ) {
+#warning remove extra check
+               if( block_num % 500 == 0 || block_num > 16129000 ) {
                   ilog( "${n} of ${head}", ("n", block_num)("head", blog_head->block_num()) );
                }
             }
