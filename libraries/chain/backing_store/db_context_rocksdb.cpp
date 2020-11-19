@@ -171,6 +171,8 @@ namespace eosio { namespace chain { namespace backing_store {
    }
 
    int32_t db_context_rocksdb::db_store_i64(uint64_t scope, uint64_t table, account_name payer, uint64_t id, const char* value , size_t value_size) {
+      set_debug(receiver, name{scope}, name{table}, id);
+      if (debug) ilog("REM ${desc}, c: ${c}, s: ${s}, t: ${t}, id: ${id}, p: ${p}",("desc",__func__)("c", receiver.to_string())("s",name{scope}.to_string())("t",name{table})("id",name{id}.to_string())("p",payer.to_string()));
       EOS_ASSERT( payer != account_name(), invalid_table_payer, "must specify a valid account to pay for new record" );
       const name scope_name{scope};
       const name table_name{table};
@@ -200,13 +202,17 @@ namespace eosio { namespace chain { namespace backing_store {
 
       const unique_table t { receiver, scope_name, table_name };
       const auto table_ei = primary_iter_store.cache_table(t);
-      return primary_iter_store.add(primary_key_iter(table_ei, id, payer));
+      auto ret = primary_iter_store.add(primary_key_iter(table_ei, id, payer));
+      if (debug) ilog("REM ${desc} ret: ${ret}",("desc",__func__)("ret",ret));
+      return ret;
    }
 
    void db_context_rocksdb::db_update_i64(int32_t itr, account_name payer, const char* value , size_t value_size) {
       const auto& key_store = primary_iter_store.get(itr);
       const auto& table_store = primary_iter_store.get_table(key_store);
       EOS_ASSERT( table_store.contract == receiver, table_access_violation, "db access violation" );
+      set_debug(table_store.contract, table_store.scope, table_store.table, key_store.primary);
+      if (debug) ilog("REM ${desc}, c: ${c}, s: ${s}, t: ${t}, id: ${id}, p: ${p}",("desc",__func__)("c", table_store.contract.to_string())("s",table_store.scope.to_string())("t",table_store.table)("id",name{key_store.primary}.to_string())("p",key_store.payer.to_string()));
       const auto old_key_value = get_primary_key_value(receiver, table_store.scope, table_store.table, key_store.primary);
 
       EOS_ASSERT( old_key_value.value, db_rocksdb_invalid_operation_exception,
@@ -256,6 +262,8 @@ namespace eosio { namespace chain { namespace backing_store {
       const auto& key_store = primary_iter_store.get(itr);
       const auto& table_store = primary_iter_store.get_table(key_store);
       EOS_ASSERT( table_store.contract == receiver, table_access_violation, "db access violation" );
+      set_debug(table_store.contract, table_store.scope, table_store.table, key_store.primary);
+      if (debug) ilog("REM ${desc}, c: ${c}, s: ${s}, t: ${t}, id: ${id}, p: ${p}",("desc",__func__)("c", table_store.contract.to_string())("s",table_store.scope.to_string())("t",table_store.table)("id",name{key_store.primary}.to_string())("p",key_store.payer.to_string()));
       const auto old_key_value = get_primary_key_value(receiver, table_store.scope, table_store.table, key_store.primary);
 
       EOS_ASSERT( old_key_value.value, db_rocksdb_invalid_operation_exception,
@@ -288,6 +296,7 @@ namespace eosio { namespace chain { namespace backing_store {
       const auto& key_store = primary_iter_store.get(itr);
       const auto& table_store = primary_iter_store.get_table(key_store);
       const auto old_key_value = get_primary_key_value(table_store.contract, table_store.scope, table_store.table, key_store.primary);
+      if (debug) ilog("REM ${desc}, c: ${c}, s: ${s}, t: ${t}, id: ${id}, p: ${p}",("desc",__func__)("c", table_store.contract.to_string())("s",table_store.scope.to_string())("t",table_store.table)("id",name{key_store.primary}.to_string())("p",key_store.payer.to_string()));
 
       EOS_ASSERT( old_key_value.value, db_rocksdb_invalid_operation_exception,
                   "invariant failure in db_get_i64, iter store found to update but nothing in database");
@@ -295,10 +304,12 @@ namespace eosio { namespace chain { namespace backing_store {
       const char* const actual_value = pp.value;
       const size_t actual_size = pp.value_size;
       if (value_size == 0) {
+         if (debug) ilog("REM ${desc} ret: ${ret}",("desc",__func__)("ret",actual_size));
          return actual_size;
       }
       const size_t copy_size = std::min<size_t>(value_size, actual_size);
       memcpy( value, actual_value, copy_size );
+      if (debug) ilog("REM ${desc} ret: ${ret}",("desc",__func__)("ret",copy_size));
       return copy_size;
    }
 
@@ -307,6 +318,7 @@ namespace eosio { namespace chain { namespace backing_store {
 
       const auto& key_store = primary_iter_store.get(itr);
       const auto& table_store = primary_iter_store.get_table(key_store);
+      if (debug) ilog("REM ${desc}, c: ${c}, s: ${s}, t: ${t}, id: ${id}, p: ${p}",("desc",__func__)("c", table_store.contract.to_string())("s",table_store.scope.to_string())("t",table_store.table)("id",name{key_store.primary}.to_string())("p",key_store.payer.to_string()));
       auto exact =
             get_exact_iterator(table_store.contract, table_store.scope, table_store.table, key_store.primary);
       EOS_ASSERT( exact.valid, db_rocksdb_invalid_operation_exception,
@@ -314,12 +326,15 @@ namespace eosio { namespace chain { namespace backing_store {
       auto& session_iter = exact.itr;
       auto& type_prefix = exact.type_prefix;
       ++session_iter;
-      return find_and_store_primary_key(session_iter, key_store.table_ei, type_prefix,
+      auto ret = find_and_store_primary_key(session_iter, key_store.table_ei, type_prefix,
                                         key_store.table_ei, __func__, primary);
+      if (debug) ilog("REM ${desc} ret: ${ret}",("desc",__func__)("ret",ret));
+      return ret;
    }
 
    int32_t db_context_rocksdb::db_previous_i64(int32_t itr, uint64_t& primary) {
       if( itr < primary_iter_store.invalid_iterator() ) { // is end iterator
+         if (debug) ilog("REM ${desc} - itr: ${itr}",("desc",__func__)("itr", itr));
          const backing_store::unique_table* table_store = primary_iter_store.find_table_by_end_iterator(itr);
          EOS_ASSERT( table_store, invalid_table_iterator, "not a valid end iterator" );
          if (current_session.begin() == current_session.end()) {
@@ -345,41 +360,59 @@ namespace eosio { namespace chain { namespace backing_store {
             }
          }
 
-         return find_and_store_primary_key(session_iter, primary_iter_store.get_end_iterator_by_table(*table_store),
+         auto ret = find_and_store_primary_key(session_iter, primary_iter_store.get_end_iterator_by_table(*table_store),
                                            primary_bounded_key.prefix_key, primary_iter_store.invalid_iterator(),
                                            __func__, primary);
+         if (debug) ilog("REM ${desc} ret: ${ret}",("desc",__func__)("ret",ret));
+         return ret;
       }
 
       const auto& key_store = primary_iter_store.get(itr);
       const backing_store::unique_table& table_store = primary_iter_store.get_table(key_store);
+      if (debug) ilog("REM ${desc}, c: ${c}, s: ${s}, t: ${t}, id: ${id}, p: ${p}",("desc",__func__)("c", table_store.contract.to_string())("s",table_store.scope.to_string())("t",table_store.table)("id",name{key_store.primary}.to_string())("p",key_store.payer.to_string()));
       const auto slice_primary_key = get_primary_slice_in_primaries(table_store.contract, table_store.scope, table_store.table, key_store.primary);
       auto exact = get_exact_iterator(table_store.contract, table_store.scope, table_store.table, key_store.primary);
       auto& session_iter = exact.itr;
       // if we didn't find the key, or know that we cannot decrement the iterator, then return the invalid iterator handle
       if (!exact.valid || session_iter == current_session.begin()) {
+         if (debug) ilog("REM ${desc} ret: ${ret}",("desc",__func__)("ret",primary_iter_store.invalid_iterator()));
          return primary_iter_store.invalid_iterator();
       }
 
       auto& type_prefix = exact.type_prefix;
       --session_iter;
-      return find_and_store_primary_key(session_iter, key_store.table_ei, type_prefix,
+      auto ret = find_and_store_primary_key(session_iter, key_store.table_ei, type_prefix,
                                         primary_iter_store.invalid_iterator(), __func__, primary);
+      if (debug) ilog("REM ${desc} ret: ${ret}",("desc",__func__)("ret",ret));
+      return ret;
    }
 
    int32_t db_context_rocksdb::db_find_i64(uint64_t code, uint64_t scope, uint64_t table, uint64_t id) {
-      return find_i64(name{code}, name{scope}, name{table}, id, comp::equals);
+      if(debug) ilog("REM ${desc}, code: ${c}, scope: ${s}, table: ${t}, id: ${i}",("desc",__func__)("c",name{code}.to_string())("s",name{scope}.to_string())("t",name{table}.to_string())("i",name{id}.to_string()));
+      auto ret = find_i64(name{code}, name{scope}, name{table}, id, comp::equals);
+      if(debug) ilog("REM ret: ${ret}",("ret",ret));
+      return ret;
    }
 
    int32_t db_context_rocksdb::db_lowerbound_i64(uint64_t code, uint64_t scope, uint64_t table, uint64_t id) {
-      return find_i64(name{code}, name{scope}, name{table}, id, comp::gte);
+      if(debug) ilog("REM ${desc}, code: ${c}, scope: ${s}, table: ${t}, id: ${i}",("desc",__func__)("c",name{code}.to_string())("s",name{scope}.to_string())("t",name{table}.to_string())("i",name{id}.to_string()));
+      auto ret = find_i64(name{code}, name{scope}, name{table}, id, comp::gte);
+      if (debug) ilog("REM ${desc} ret: ${ret}",("desc",__func__)("ret",ret));
+      return ret;
    }
 
    int32_t db_context_rocksdb::db_upperbound_i64(uint64_t code, uint64_t scope, uint64_t table, uint64_t id) {
-      return find_i64(name{code}, name{scope}, name{table}, id, comp::gt);
+      if(debug) ilog("REM ${desc}, code: ${c}, scope: ${s}, table: ${t}, id: ${i}",("desc",__func__)("c",name{code}.to_string())("s",name{scope}.to_string())("t",name{table}.to_string())("i",name{id}.to_string()));
+      auto ret = find_i64(name{code}, name{scope}, name{table}, id, comp::gt);
+      if (debug) ilog("REM ${desc} ret: ${ret}",("desc",__func__)("ret",ret));
+      return ret;
    }
 
    int32_t db_context_rocksdb::db_end_i64(uint64_t code, uint64_t scope, uint64_t table) {
-      return primary_lookup.get_end_iter(name{code}, name{scope}, name{table}, primary_iter_store);
+      if (debug) ilog("REM ${desc}, c: ${c}, s: ${s}, t: ${t}",("desc",__func__)("c", receiver.to_string())("s",name{scope}.to_string())("t",name{table}));
+      auto ret = primary_lookup.get_end_iter(name{code}, name{scope}, name{table}, primary_iter_store);
+      if (debug) ilog("REM ${desc} ret: ${ret}",("desc",__func__)("ret",ret));
+      return ret;
    }
 
    /**
@@ -387,47 +420,73 @@ namespace eosio { namespace chain { namespace backing_store {
     */
    int32_t db_context_rocksdb::db_idx64_store(uint64_t scope, uint64_t table, account_name payer, uint64_t id,
                                               const uint64_t& secondary) {
-      return sec_lookup_i64.store(name{scope}, name{table}, payer, id, secondary);
+      if (debug) ilog("REM ${desc}, c: ${c}, s: ${s}, t: ${t}, id: ${id}, p: ${p}",("desc",__func__)("c", receiver.to_string())("s",name{scope}.to_string())("t",name{table})("id",name{id}.to_string())("p",payer.to_string()));
+      auto ret = sec_lookup_i64.store(name{scope}, name{table}, payer, id, secondary);
+      if (debug) ilog("REM ${desc} ret: ${ret}",("desc",__func__)("ret",ret));
+      return ret;
    }
 
    void db_context_rocksdb::db_idx64_update(int32_t iterator, account_name payer, const uint64_t& secondary) {
+      if (debug) ilog("REM ${desc} - itr: ${itr}",("desc",__func__)("itr", iterator));
       sec_lookup_i64.update(iterator, payer, secondary);
    }
 
    void db_context_rocksdb::db_idx64_remove(int32_t iterator) {
+      if (debug) ilog("REM ${desc} - itr: ${itr}",("desc",__func__)("itr", iterator));
       sec_lookup_i64.remove(iterator);
    }
 
    int32_t db_context_rocksdb::db_idx64_find_secondary(uint64_t code, uint64_t scope, uint64_t table, const uint64_t& secondary,
                                    uint64_t& primary) {
-      return sec_lookup_i64.find_secondary(name{code}, name{scope}, name{table}, secondary, primary);
+      if (debug) ilog("REM ${desc}, c: ${c}, s: ${s}, t: ${t}",("desc",__func__)("c", receiver.to_string())("s",name{scope}.to_string())("t",name{table}));
+      auto ret = sec_lookup_i64.find_secondary(name{code}, name{scope}, name{table}, secondary, primary);
+      if (debug) ilog("REM ${desc} ret: ${ret}",("desc",__func__)("ret",ret));
+      return ret;
    }
 
    int32_t db_context_rocksdb::db_idx64_find_primary(uint64_t code, uint64_t scope, uint64_t table, uint64_t& secondary,
                                  uint64_t primary) {
-      return sec_lookup_i64.find_primary(name{code}, name{scope}, name{table}, secondary, primary);
+      if (debug) ilog("REM ${desc}, c: ${c}, s: ${s}, t: ${t}",("desc",__func__)("c", receiver.to_string())("s",name{scope}.to_string())("t",name{table}));
+      auto ret = sec_lookup_i64.find_primary(name{code}, name{scope}, name{table}, secondary, primary);
+      if (debug) ilog("REM ${desc} ret: ${ret}",("desc",__func__)("ret",ret));
+      return ret;
    }
 
    int32_t db_context_rocksdb::db_idx64_lowerbound(uint64_t code, uint64_t scope, uint64_t table, uint64_t& secondary,
                                uint64_t& primary) {
-      return sec_lookup_i64.lowerbound_secondary(name{code}, name{scope}, name{table}, secondary, primary);
+      if (debug) ilog("REM ${desc}, c: ${c}, s: ${s}, t: ${t}",("desc",__func__)("c", receiver.to_string())("s",name{scope}.to_string())("t",name{table}));
+      auto ret = sec_lookup_i64.lowerbound_secondary(name{code}, name{scope}, name{table}, secondary, primary);
+      if (debug) ilog("REM ${desc} ret: ${ret}",("desc",__func__)("ret",ret));
+      return ret;
    }
 
    int32_t db_context_rocksdb::db_idx64_upperbound(uint64_t code, uint64_t scope, uint64_t table, uint64_t& secondary,
                                uint64_t& primary) {
-      return sec_lookup_i64.upperbound_secondary(name{code}, name{scope}, name{table}, secondary, primary);
+      if (debug) ilog("REM ${desc}, c: ${c}, s: ${s}, t: ${t}",("desc",__func__)("c", receiver.to_string())("s",name{scope}.to_string())("t",name{table}));
+      auto ret = sec_lookup_i64.upperbound_secondary(name{code}, name{scope}, name{table}, secondary, primary);
+      if (debug) ilog("REM ${desc} ret: ${ret}",("desc",__func__)("ret",ret));
+      return ret;
    }
 
    int32_t db_context_rocksdb::db_idx64_end(uint64_t code, uint64_t scope, uint64_t table) {
-      return sec_lookup_i64.end_secondary(name{code}, name{scope}, name{table});
+      if (debug) ilog("REM ${desc}, c: ${c}, s: ${s}, t: ${t}",("desc",__func__)("c", receiver.to_string())("s",name{scope}.to_string())("t",name{table}));
+      auto ret = sec_lookup_i64.end_secondary(name{code}, name{scope}, name{table});
+      if (debug) ilog("REM ${desc} ret: ${ret}",("desc",__func__)("ret",ret));
+      return ret;
    }
 
    int32_t db_context_rocksdb::db_idx64_next(int32_t iterator, uint64_t& primary) {
-      return sec_lookup_i64.next_secondary(iterator, primary);
+      if (debug) ilog("REM ${desc} - itr: ${itr}",("desc",__func__)("itr", iterator));
+      auto ret = sec_lookup_i64.next_secondary(iterator, primary);
+      if (debug) ilog("REM ${desc} ret: ${ret}",("desc",__func__)("ret",ret));
+      return ret;
    }
 
    int32_t db_context_rocksdb::db_idx64_previous(int32_t iterator, uint64_t& primary) {
-      return sec_lookup_i64.previous_secondary(iterator, primary);
+      if (debug) ilog("REM ${desc} - itr: ${itr}",("desc",__func__)("itr", iterator));
+      auto ret = sec_lookup_i64.previous_secondary(iterator, primary);
+      if (debug) ilog("REM ${desc} ret: ${ret}",("desc",__func__)("ret",ret));
+      return ret;
    }
 
    /**
@@ -435,47 +494,73 @@ namespace eosio { namespace chain { namespace backing_store {
     */
    int32_t db_context_rocksdb::db_idx128_store(uint64_t scope, uint64_t table, account_name payer, uint64_t id,
                            const uint128_t& secondary) {
-      return sec_lookup_i128.store(name{scope}, name{table}, payer, id, secondary);
+      if (debug) ilog("REM ${desc}",("desc",__func__));
+      auto ret = sec_lookup_i128.store(name{scope}, name{table}, payer, id, secondary);
+      if (debug) ilog("REM ${desc} ret: ${ret}",("desc",__func__)("ret",ret));
+      return ret;
    }
 
    void db_context_rocksdb::db_idx128_update(int32_t iterator, account_name payer, const uint128_t& secondary) {
+      if (debug) ilog("REM ${desc} - itr: ${itr}",("desc",__func__)("itr", iterator));
       sec_lookup_i128.update(iterator, payer, secondary);
    }
 
    void db_context_rocksdb::db_idx128_remove(int32_t iterator) {
+      if (debug) ilog("REM ${desc} - itr: ${itr}",("desc",__func__)("itr", iterator));
       sec_lookup_i128.remove(iterator);
    }
 
    int32_t db_context_rocksdb::db_idx128_find_secondary(uint64_t code, uint64_t scope, uint64_t table, const uint128_t& secondary,
                                     uint64_t& primary) {
-      return sec_lookup_i128.find_secondary(name{code}, name{scope}, name{table}, secondary, primary);
+      if (debug) ilog("REM ${desc}",("desc",__func__));
+      auto ret = sec_lookup_i128.find_secondary(name{code}, name{scope}, name{table}, secondary, primary);
+      if (debug) ilog("REM ${desc} ret: ${ret}",("desc",__func__)("ret",ret));
+      return ret;
    }
 
    int32_t db_context_rocksdb::db_idx128_find_primary(uint64_t code, uint64_t scope, uint64_t table, uint128_t& secondary,
                                   uint64_t primary) {
-      return sec_lookup_i128.find_primary(name{code}, name{scope}, name{table}, secondary, primary);
+      if (debug) ilog("REM ${desc}",("desc",__func__));
+      auto ret = sec_lookup_i128.find_primary(name{code}, name{scope}, name{table}, secondary, primary);
+      if (debug) ilog("REM ${desc} ret: ${ret}",("desc",__func__)("ret",ret));
+      return ret;
    }
 
    int32_t db_context_rocksdb::db_idx128_lowerbound(uint64_t code, uint64_t scope, uint64_t table, uint128_t& secondary,
                                 uint64_t& primary) {
-      return sec_lookup_i128.lowerbound_secondary(name{code}, name{scope}, name{table}, secondary, primary);
+      if (debug) ilog("REM ${desc}",("desc",__func__));
+      auto ret = sec_lookup_i128.lowerbound_secondary(name{code}, name{scope}, name{table}, secondary, primary);
+      if (debug) ilog("REM ${desc} ret: ${ret}",("desc",__func__)("ret",ret));
+      return ret;
    }
 
    int32_t db_context_rocksdb::db_idx128_upperbound(uint64_t code, uint64_t scope, uint64_t table, uint128_t& secondary,
                                 uint64_t& primary) {
-      return sec_lookup_i128.upperbound_secondary(name{code}, name{scope}, name{table}, secondary, primary);
+      if (debug) ilog("REM ${desc}",("desc",__func__));
+      auto ret = sec_lookup_i128.upperbound_secondary(name{code}, name{scope}, name{table}, secondary, primary);
+      if (debug) ilog("REM ${desc} ret: ${ret}",("desc",__func__)("ret",ret));
+      return ret;
    }
 
    int32_t db_context_rocksdb::db_idx128_end(uint64_t code, uint64_t scope, uint64_t table) {
-      return sec_lookup_i128.end_secondary(name{code}, name{scope}, name{table});
+      if (debug) ilog("REM ${desc}",("desc",__func__));
+      auto ret = sec_lookup_i128.end_secondary(name{code}, name{scope}, name{table});
+      if (debug) ilog("REM ${desc} ret: ${ret}",("desc",__func__)("ret",ret));
+      return ret;
    }
 
    int32_t db_context_rocksdb::db_idx128_next(int32_t iterator, uint64_t& primary) {
-      return sec_lookup_i128.next_secondary(iterator, primary);
+      if (debug) ilog("REM ${desc} - itr: ${itr}",("desc",__func__)("itr", iterator));
+      auto ret = sec_lookup_i128.next_secondary(iterator, primary);
+      if (debug) ilog("REM ${desc} ret: ${ret}",("desc",__func__)("ret",ret));
+      return ret;
    }
 
    int32_t db_context_rocksdb::db_idx128_previous(int32_t iterator, uint64_t& primary) {
-      return sec_lookup_i128.previous_secondary(iterator, primary);
+      if (debug) ilog("REM ${desc} - itr: ${itr}",("desc",__func__)("itr", iterator));
+      auto ret = sec_lookup_i128.previous_secondary(iterator, primary);
+      if (debug) ilog("REM ${desc} ret: ${ret}",("desc",__func__)("ret",ret));
+      return ret;
    }
 
    eosio::chain::key256_t convert(const uint128_t* data) {
@@ -493,59 +578,82 @@ namespace eosio { namespace chain { namespace backing_store {
     */
    int32_t db_context_rocksdb::db_idx256_store(uint64_t scope, uint64_t table, account_name payer, uint64_t id,
                            const uint128_t* data) {
+      if (debug) ilog("REM ${desc}",("desc",__func__));
       const auto secondary = convert(data);
-      return sec_lookup_i256.store(name{scope}, name{table}, payer, id, secondary);
+      auto ret = sec_lookup_i256.store(name{scope}, name{table}, payer, id, secondary);
+      if (debug) ilog("REM ${desc} ret: ${ret}",("desc",__func__)("ret",ret));
+      return ret;
    }
 
    void db_context_rocksdb::db_idx256_update(int32_t iterator, account_name payer, const uint128_t* data) {
+      if (debug) ilog("REM ${desc} - itr: ${itr}",("desc",__func__)("itr", iterator));
       const auto secondary = convert(data);
       sec_lookup_i256.update(iterator, payer, secondary);
    }
 
    void db_context_rocksdb::db_idx256_remove(int32_t iterator) {
+      if (debug) ilog("REM ${desc} - itr: ${itr}",("desc",__func__)("itr", iterator));
       sec_lookup_i256.remove(iterator);
    }
 
    int32_t db_context_rocksdb::db_idx256_find_secondary(uint64_t code, uint64_t scope, uint64_t table, const uint128_t* data,
                                     uint64_t& primary) {
+      if (debug) ilog("REM ${desc}",("desc",__func__));
       const auto secondary = convert(data);
-      return sec_lookup_i256.find_secondary(name{code}, name{scope}, name{table}, secondary, primary);
+      auto ret = sec_lookup_i256.find_secondary(name{code}, name{scope}, name{table}, secondary, primary);
+      if (debug) ilog("REM ${desc} ret: ${ret}",("desc",__func__)("ret",ret));
+      return ret;
    }
 
    int32_t db_context_rocksdb::db_idx256_find_primary(uint64_t code, uint64_t scope, uint64_t table, uint128_t* data,
                                   uint64_t primary) {
+      if (debug) ilog("REM ${desc}",("desc",__func__));
       auto secondary = convert(data);
       auto ret = sec_lookup_i256.find_primary(name{code}, name{scope}, name{table}, secondary, primary);
       convert_back(data, secondary);
+      if (debug) ilog("REM ${desc} ret: ${ret}",("desc",__func__)("ret",ret));
       return ret;
    }
 
    int32_t db_context_rocksdb::db_idx256_lowerbound(uint64_t code, uint64_t scope, uint64_t table, uint128_t* data,
                                 uint64_t& primary) {
+      if (debug) ilog("REM ${desc}",("desc",__func__));
       auto secondary = convert(data);
       auto ret = sec_lookup_i256.lowerbound_secondary(name{code}, name{scope}, name{table}, secondary, primary);
       convert_back(data, secondary);
+      if (debug) ilog("REM ${desc} ret: ${ret}",("desc",__func__)("ret",ret));
       return ret;
    }
 
    int32_t db_context_rocksdb::db_idx256_upperbound(uint64_t code, uint64_t scope, uint64_t table, uint128_t* data,
                                 uint64_t& primary) {
+      if (debug) ilog("REM ${desc}",("desc",__func__));
       auto secondary = convert(data);
       auto ret = sec_lookup_i256.upperbound_secondary(name{code}, name{scope}, name{table}, secondary, primary);
       convert_back(data, secondary);
+      if (debug) ilog("REM ${desc} ret: ${ret}",("desc",__func__)("ret",ret));
       return ret;
    }
 
    int32_t db_context_rocksdb::db_idx256_end(uint64_t code, uint64_t scope, uint64_t table) {
-      return sec_lookup_i256.end_secondary(name{code}, name{scope}, name{table});
+      if (debug) ilog("REM ${desc}",("desc",__func__));
+      auto ret = sec_lookup_i256.end_secondary(name{code}, name{scope}, name{table});
+      if (debug) ilog("REM ${desc} ret: ${ret}",("desc",__func__)("ret",ret));
+      return ret;
    }
 
    int32_t db_context_rocksdb::db_idx256_next(int32_t iterator, uint64_t& primary) {
-      return sec_lookup_i256.next_secondary(iterator, primary);
+      if (debug) ilog("REM ${desc} - itr: ${itr}",("desc",__func__)("itr", iterator));
+      auto ret = sec_lookup_i256.next_secondary(iterator, primary);
+      if (debug) ilog("REM ${desc} ret: ${ret}",("desc",__func__)("ret",ret));
+      return ret;
    }
 
    int32_t db_context_rocksdb::db_idx256_previous(int32_t iterator, uint64_t& primary) {
-      return sec_lookup_i256.previous_secondary(iterator, primary);
+      if (debug) ilog("REM ${desc} - itr: ${itr}",("desc",__func__)("itr", iterator));
+      auto ret = sec_lookup_i256.previous_secondary(iterator, primary);
+      if (debug) ilog("REM ${desc} ret: ${ret}",("desc",__func__)("ret",ret));
+      return ret;
    }
 
    /**
@@ -553,47 +661,73 @@ namespace eosio { namespace chain { namespace backing_store {
     */
    int32_t db_context_rocksdb::db_idx_double_store(uint64_t scope, uint64_t table, account_name payer, uint64_t id,
                                const float64_t& secondary) {
-      return sec_lookup_double.store(name{scope}, name{table}, payer, id, secondary);
+      if (debug) ilog("REM ${desc}",("desc",__func__));
+      auto ret = sec_lookup_double.store(name{scope}, name{table}, payer, id, secondary);
+      if (debug) ilog("REM ${desc} ret: ${ret}",("desc",__func__)("ret",ret));
+      return ret;
    }
 
    void db_context_rocksdb::db_idx_double_update(int32_t iterator, account_name payer, const float64_t& secondary) {
+      if (debug) ilog("REM ${desc} - itr: ${itr}",("desc",__func__)("itr", iterator));
       sec_lookup_double.update(iterator, payer, secondary);
    }
 
    void db_context_rocksdb::db_idx_double_remove(int32_t iterator) {
+      if (debug) ilog("REM ${desc} - itr: ${itr}",("desc",__func__)("itr", iterator));
       sec_lookup_double.remove(iterator);
    }
 
    int32_t db_context_rocksdb::db_idx_double_find_secondary(uint64_t code, uint64_t scope, uint64_t table,
                                         const float64_t& secondary, uint64_t& primary) {
-      return sec_lookup_double.find_secondary(name{code}, name{scope}, name{table}, secondary, primary);
+      if (debug) ilog("REM ${desc}",("desc",__func__));
+      auto ret = sec_lookup_double.find_secondary(name{code}, name{scope}, name{table}, secondary, primary);
+      if (debug) ilog("REM ${desc} ret: ${ret}",("desc",__func__)("ret",ret));
+      return ret;
    }
 
    int32_t db_context_rocksdb::db_idx_double_find_primary(uint64_t code, uint64_t scope, uint64_t table, float64_t& secondary,
                                       uint64_t primary) {
-      return sec_lookup_double.find_primary(name{code}, name{scope}, name{table}, secondary, primary);
+      if (debug) ilog("REM ${desc}",("desc",__func__));
+      auto ret = sec_lookup_double.find_primary(name{code}, name{scope}, name{table}, secondary, primary);
+      if (debug) ilog("REM ${desc} ret: ${ret}",("desc",__func__)("ret",ret));
+      return ret;
    }
 
    int32_t db_context_rocksdb::db_idx_double_lowerbound(uint64_t code, uint64_t scope, uint64_t table, float64_t& secondary,
                                     uint64_t& primary) {
-      return sec_lookup_double.lowerbound_secondary(name{code}, name{scope}, name{table}, secondary, primary);
+      if (debug) ilog("REM ${desc}",("desc",__func__));
+      auto ret = sec_lookup_double.lowerbound_secondary(name{code}, name{scope}, name{table}, secondary, primary);
+      if (debug) ilog("REM ${desc} ret: ${ret}",("desc",__func__)("ret",ret));
+      return ret;
    }
 
    int32_t db_context_rocksdb::db_idx_double_upperbound(uint64_t code, uint64_t scope, uint64_t table, float64_t& secondary,
                                     uint64_t& primary) {
-      return sec_lookup_double.upperbound_secondary(name{code}, name{scope}, name{table}, secondary, primary);
+      if (debug) ilog("REM ${desc}",("desc",__func__));
+      auto ret = sec_lookup_double.upperbound_secondary(name{code}, name{scope}, name{table}, secondary, primary);
+      if (debug) ilog("REM ${desc} ret: ${ret}",("desc",__func__)("ret",ret));
+      return ret;
    }
 
    int32_t db_context_rocksdb::db_idx_double_end(uint64_t code, uint64_t scope, uint64_t table) {
-      return sec_lookup_double.end_secondary(name{code}, name{scope}, name{table});
+      if (debug) ilog("REM ${desc}",("desc",__func__));
+      auto ret = sec_lookup_double.end_secondary(name{code}, name{scope}, name{table});
+      if (debug) ilog("REM ${desc} ret: ${ret}",("desc",__func__)("ret",ret));
+      return ret;
    }
 
    int32_t db_context_rocksdb::db_idx_double_next(int32_t iterator, uint64_t& primary) {
-      return sec_lookup_double.next_secondary(iterator, primary);
+      if (debug) ilog("REM ${desc} - itr: ${itr}",("desc",__func__)("itr", iterator));
+      auto ret = sec_lookup_double.next_secondary(iterator, primary);
+      if (debug) ilog("REM ${desc} ret: ${ret}",("desc",__func__)("ret",ret));
+      return ret;
    }
 
    int32_t db_context_rocksdb::db_idx_double_previous(int32_t iterator, uint64_t& primary) {
-      return sec_lookup_double.previous_secondary(iterator, primary);
+      if (debug) ilog("REM ${desc} - itr: ${itr}",("desc",__func__)("itr", iterator));
+      auto ret = sec_lookup_double.previous_secondary(iterator, primary);
+      if (debug) ilog("REM ${desc} ret: ${ret}",("desc",__func__)("ret",ret));
+      return ret;
    }
 
    /**
@@ -601,47 +735,73 @@ namespace eosio { namespace chain { namespace backing_store {
     */
    int32_t db_context_rocksdb::db_idx_long_double_store(uint64_t scope, uint64_t table, account_name payer, uint64_t id,
                                                         const float128_t& secondary) {
-      return sec_lookup_long_double.store(name{scope}, name{table}, payer, id, secondary);
+      if (debug) ilog("REM ${desc}",("desc",__func__));
+      auto ret = sec_lookup_long_double.store(name{scope}, name{table}, payer, id, secondary);
+      if (debug) ilog("REM ${desc} ret: ${ret}",("desc",__func__)("ret",ret));
+      return ret;
    }
 
    void db_context_rocksdb::db_idx_long_double_update(int32_t iterator, account_name payer, const float128_t& secondary) {
+      if (debug) ilog("REM ${desc} - itr: ${itr}",("desc",__func__)("itr", iterator));
       sec_lookup_long_double.update(iterator, payer, secondary);
    }
 
    void db_context_rocksdb::db_idx_long_double_remove(int32_t iterator) {
+      if (debug) ilog("REM ${desc} - itr: ${itr}",("desc",__func__)("itr", iterator));
       sec_lookup_long_double.remove(iterator);
    }
 
    int32_t db_context_rocksdb::db_idx_long_double_find_secondary(uint64_t code, uint64_t scope, uint64_t table,
                                                                  const float128_t& secondary, uint64_t& primary) {
-      return sec_lookup_long_double.find_secondary(name{code}, name{scope}, name{table}, secondary, primary);
+      if (debug) ilog("REM ${desc}",("desc",__func__));
+      auto ret = sec_lookup_long_double.find_secondary(name{code}, name{scope}, name{table}, secondary, primary);
+      if (debug) ilog("REM ${desc} ret: ${ret}",("desc",__func__)("ret",ret));
+      return ret;
    }
 
    int32_t db_context_rocksdb::db_idx_long_double_find_primary(uint64_t code, uint64_t scope, uint64_t table,
                                                                float128_t& secondary, uint64_t primary) {
-      return sec_lookup_long_double.find_primary(name{code}, name{scope}, name{table}, secondary, primary);
+      if (debug) ilog("REM ${desc}",("desc",__func__));
+      auto ret = sec_lookup_long_double.find_primary(name{code}, name{scope}, name{table}, secondary, primary);
+      if (debug) ilog("REM ${desc} ret: ${ret}",("desc",__func__)("ret",ret));
+      return ret;
    }
 
    int32_t db_context_rocksdb::db_idx_long_double_lowerbound(uint64_t code, uint64_t scope, uint64_t table, float128_t& secondary,
                                                              uint64_t& primary) {
-      return sec_lookup_long_double.lowerbound_secondary(name{code}, name{scope}, name{table}, secondary, primary);
+      if (debug) ilog("REM ${desc}",("desc",__func__));
+      auto ret = sec_lookup_long_double.lowerbound_secondary(name{code}, name{scope}, name{table}, secondary, primary);
+      if (debug) ilog("REM ${desc} ret: ${ret}",("desc",__func__)("ret",ret));
+      return ret;
    }
 
    int32_t db_context_rocksdb::db_idx_long_double_upperbound(uint64_t code, uint64_t scope, uint64_t table, float128_t& secondary,
                                                              uint64_t& primary) {
-      return sec_lookup_long_double.upperbound_secondary(name{code}, name{scope}, name{table}, secondary, primary);
+      if (debug) ilog("REM ${desc}",("desc",__func__));
+      auto ret = sec_lookup_long_double.upperbound_secondary(name{code}, name{scope}, name{table}, secondary, primary);
+      if (debug) ilog("REM ${desc} ret: ${ret}",("desc",__func__)("ret",ret));
+      return ret;
    }
 
    int32_t db_context_rocksdb::db_idx_long_double_end(uint64_t code, uint64_t scope, uint64_t table) {
-      return sec_lookup_long_double.end_secondary(name{code}, name{scope}, name{table});
+      if (debug) ilog("REM ${desc}",("desc",__func__));
+      auto ret = sec_lookup_long_double.end_secondary(name{code}, name{scope}, name{table});
+      if (debug) ilog("REM ${desc} ret: ${ret}",("desc",__func__)("ret",ret));
+      return ret;
    }
 
    int32_t db_context_rocksdb::db_idx_long_double_next(int32_t iterator, uint64_t& primary) {
-      return sec_lookup_long_double.next_secondary(iterator, primary);
+      if (debug) ilog("REM ${desc} - itr: ${itr}",("desc",__func__)("itr", iterator));
+      auto ret = sec_lookup_long_double.next_secondary(iterator, primary);
+      if (debug) ilog("REM ${desc} ret: ${ret}",("desc",__func__)("ret",ret));
+      return ret;
    }
 
    int32_t db_context_rocksdb::db_idx_long_double_previous(int32_t iterator, uint64_t& primary) {
-      return sec_lookup_long_double.previous_secondary(iterator, primary);
+      if (debug) ilog("REM ${desc} - itr: ${itr}",("desc",__func__)("itr", iterator));
+      auto ret = sec_lookup_long_double.previous_secondary(iterator, primary);
+      if (debug) ilog("REM ${desc} ret: ${ret}",("desc",__func__)("ret",ret));
+      return ret;
    }
 
    // for primary keys in the iterator store, we don't care about secondary key
@@ -700,12 +860,22 @@ namespace eosio { namespace chain { namespace backing_store {
       // or if an invalid iterator needs to be returned
       prefix_bundle primary_and_prefix_keys { db_key_value_format::create_primary_key(scope, table, id),
                                               end_of_prefix::pre_type, code };
+      using Session = decltype(current_session);
+      struct session_debug {
+         session_debug(bool d, Session& s) : debug(d), session(s) { if (debug) session.set_debug(true); }
+         bool debug = false;
+         Session& session;
+      };
+      session_debug sd(debug, current_session);
+      current_session.print_key(primary_and_prefix_keys.full_key, "looking for");
+      current_session.print_key(primary_and_prefix_keys.prefix_key, "prefix");
       auto session_iter = current_session.lower_bound(primary_and_prefix_keys.full_key);
       auto is_in_table = [&prefix_key=primary_and_prefix_keys.prefix_key,
                           &primary_lookup=this->primary_lookup](const session_type::iterator& iter) {
          return primary_lookup.match_prefix(prefix_key, iter);
       };
       if (!is_in_table(session_iter)) {
+         if (debug) ilog("REM nothing");
          // if no iterator was found in this table, then there is no table entry, so the table is empty
          return primary_iter_store.invalid_iterator();
       }
@@ -719,9 +889,11 @@ namespace eosio { namespace chain { namespace backing_store {
       std::optional<uint64_t> primary_key;
       if (!primary_lookup.match(primary_and_prefix_keys.full_key, (*session_iter).first)) {
          if (comparison == comp::equals) {
+            if (debug) ilog("REM does not equal");
             return table_ei;
          }
          else if (!primary_lookup.match_prefix(desired_type_prefix, (*session_iter).first)) {
+            if (debug) ilog("REM not type");
             return table_ei;
          }
       }
@@ -731,6 +903,7 @@ namespace eosio { namespace chain { namespace backing_store {
          EOS_ASSERT( is_in_table(session_iter), db_rocksdb_invalid_operation_exception,
                      "invariant failure in find_i64, primary key found but was not followed by a table key");
          if (!primary_lookup.match_prefix(desired_type_prefix, session_iter)) {
+            if (debug) ilog("REM greater not type");
             return table_ei;
          }
       }

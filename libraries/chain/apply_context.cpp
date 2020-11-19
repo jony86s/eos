@@ -52,6 +52,9 @@ apply_context::apply_context(controller& con, transaction_context& trx_ctx, uint
    receiver = trace.receiver;
    context_free = trace.context_free;
    _db_context = control.kv_db().create_db_context(*this, receiver);
+   if (control.kv_db().get_kv_undo_stack() && !control.kv_db().get_kv_undo_stack()->empty()) {
+      _db_context->debug = control.kv_db().get_kv_undo_stack()->top().debug;
+   }
 }
 
 template <typename Exception>
@@ -218,11 +221,17 @@ void apply_context::finalize_trace( action_trace& trace, const fc::time_point& s
 void apply_context::exec()
 {
    _notified.emplace_back( receiver, action_ordinal );
+   if (_db_context->debug) {
+      ilog("REM calling exec_one on ${rec} for ${act}",("rec",receiver.to_string())("act",act->name.to_string()));
+   }
    exec_one();
    increment_action_id();
    for( uint32_t i = 1; i < _notified.size(); ++i ) {
       std::tie( receiver, action_ordinal ) = _notified[i];
       _db_context->receiver = receiver;
+      if (_db_context->debug) {
+         ilog("REM calling exec_one (notified) on ${rec} for ${act}",("rec",receiver.to_string())("act",act->name.to_string()));
+      }
       exec_one();
       increment_action_id();
    }
@@ -233,10 +242,16 @@ void apply_context::exec()
    }
 
    for( uint32_t ordinal : _cfa_inline_actions ) {
+      if (_db_context->debug) {
+         ilog("REM cfa inline action");
+      }
       trx_context.execute_action( ordinal, recurse_depth + 1 );
    }
 
    for( uint32_t ordinal : _inline_actions ) {
+      if (_db_context->debug) {
+         ilog("REM inline action");
+      }
       trx_context.execute_action( ordinal, recurse_depth + 1 );
    }
 
@@ -697,7 +712,6 @@ bool apply_context::cancel_deferred_transaction( const uint128_t& sender_id, acc
             ("trx", control.maybe_to_variant_with_abi(dtrx, abi_serializer::create_yield_function(control.get_abi_serializer_max_time())))
          );
       }
-
       add_ram_usage( gto->payer, -(config::billable_size_v<generated_transaction_object> + gto->packed_trx.size()), storage_usage_trace(get_action_id(), std::move(event_id), "deferred_trx", "cancel", "deferred_trx_cancel") );
       generated_transaction_idx.remove(*gto);
    }
@@ -1027,11 +1041,14 @@ int apply_context::db_find_i64_chainbase( name code, name scope, name table, uin
    if( !tab ) return -1;
 
    auto table_end_itr = db_iter_store.cache_table( *tab );
+   if(_db_context->debug) ilog("REM code: ${c}, scope: ${s}, table: ${t}, id: ${i}, end: ${e}",("c",code.to_string())("s",scope.to_string())("t",table.to_string())("i",name{id}.to_string())("e",table_end_itr));
 
    const key_value_object* obj = db.find<key_value_object, by_scope_primary>( boost::make_tuple( tab->id, id ) );
    if( !obj ) return table_end_itr;
 
-   return db_iter_store.add( *obj );
+   auto ret = db_iter_store.add( *obj );
+   if(_db_context->debug) ilog("REM ret: ${ret}",("ret",ret));
+   return ret;
 }
 
 int apply_context::db_lowerbound_i64_chainbase( name code, name scope, name table, uint64_t id ) {

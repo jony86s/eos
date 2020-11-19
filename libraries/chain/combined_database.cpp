@@ -557,23 +557,30 @@ namespace eosio { namespace chain {
       while (more) {
          // read the row for the table
          table_id_object::id_type t_id;
+         name scope;
+         bool part = false;
 
-         index_utils<table_id_multi_index>::create(db, [&db, &section, &t_id](auto& row) {
+         index_utils<table_id_multi_index>::create(db, [&db, &section, &t_id, &scope, &part](auto& row) {
             section.read_row(row, db);
             t_id = row.id;
+            scope = row.scope;
+            part = row.code == name{"thedeosgames"} && row.table == name{"dicegames"};
          });
 
          // read the size and data rows for each type of table
-         contract_database_index_set::walk_indices([&db, &section, &t_id, &more](auto utils) {
+         contract_database_index_set::walk_indices([&db, &section, &t_id, &more, &part, &scope](auto utils) {
             using utils_t = decltype(utils);
 
             unsigned_int size;
             more = section.read_row(size, db);
 
             for (size_t idx = 0; idx < size.value; ++idx) {
-               utils_t::create(db, [&db, &section, &more, &t_id](auto& row) {
+               utils_t::create(db, [&db, &section, &more, &t_id, &part, &scope](auto& row) {
                   row.t_id = t_id;
                   more     = section.read_row(row, db);
+                  if(part && row.primary_key == name{".........dd53"}.to_uint64_t()) {
+                     ilog("REM added with scope: ${s}",("s",scope));
+                  }
                });
             }
          });
