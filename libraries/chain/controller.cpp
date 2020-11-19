@@ -437,11 +437,12 @@ struct controller_impl {
       if( start_block_num <= blog_head->block_num() ) {
          ilog( "existing block log, attempting to replay from ${s} to ${n} blocks",
                ("s", start_block_num)("n", blog_head->block_num()) );
+         manage_stack::kv_undo_stack* undo_stack = kv_db.get_kv_undo_stack().get();
+         if (!undo_stack || !self.skip_db_sessions( controller::block_status::irreversible ) || !undo_stack->empty()) {
+            undo_stack = nullptr;
+         }
+         manage_stack ms_outer(undo_stack);
          try {
-            manage_stack::kv_undo_stack* undo_stack = kv_db.get_kv_undo_stack().get();
-            if (!undo_stack || !self.skip_db_sessions( controller::block_status::irreversible ) || !undo_stack->empty()) {
-               undo_stack = nullptr;
-            }
             while( std::unique_ptr<signed_block> next = blog.read_signed_block_by_num( head->block_num + 1 ) ) {
                manage_stack ms(undo_stack);
                auto block_num = next->block_num();
@@ -451,9 +452,14 @@ struct controller_impl {
                if( block_num % 500 == 0 ) {
                   ilog( "${n} of ${head}", ("n", block_num)("head", blog_head->block_num()) );
                }
+               if( block_num % 100 == 0 ) {
+                  ms_outer.squash();
+               }
             }
          } catch(  const database_guard_exception& e ) {
             except_ptr = std::current_exception();
+            // the most recent block was rolled back by ms, but the rest of the blocks are complete in ms_outer
+            ms_outer.squash();
          }
          ilog( "${n} irreversible blocks replayed", ("n", 1 + head->block_num - start_block_num) );
 
