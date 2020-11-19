@@ -157,7 +157,7 @@ inline session<rocksdb_t>::session(std::shared_ptr<rocksdb::DB> db, size_t max_i
          read_options.fill_cache       = false;
          // read_options.tailing = true;
          read_options.background_purge_on_iterator_cleanup = true;
-         read_options.pin_data                             = true;
+         read_options.pin_data                             = false;
          return read_options;
       }() },
       m_iterators{ [&]() {
