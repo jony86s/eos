@@ -176,6 +176,11 @@ namespace eosio { namespace chain {
             options.create_if_missing = !cfg.read_only; // Creates a database if it is missing
             options.level_compaction_dynamic_level_bytes = true;
             options.bytes_per_sync = 1048576; // used to control the write rate of flushes and compactions.
+            options.allow_mmap_reads = true;
+            options.allow_mmap_writes = true;
+            options.use_adaptive_mutex = true;
+            options.avoid_unnecessary_blocking_io = true;
+
 
             // By default, RocksDB uses only one background thread
             // for flush and compaction.
