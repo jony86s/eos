@@ -64,7 +64,7 @@ namespace eosio { namespace chain {
 
    class controller {
       public:
-         uint32_t blocks_per_session_squash = 0;
+         uint32_t blocks_per_session_squash = 500;
          struct config {
             flat_set<account_name>   sender_bypass_whiteblacklist;
             flat_set<account_name>   actor_whitelist;
