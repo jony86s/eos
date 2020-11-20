@@ -452,7 +452,7 @@ struct controller_impl {
                if( block_num % 500 == 0 ) {
                   ilog( "${n} of ${head}", ("n", block_num)("head", blog_head->block_num()) );
                }
-               if( block_num % 100 == 0 ) {
+               if( block_num % self.blocks_per_session_squash == 0 ) {
                   ms_outer.squash();
                }
             }

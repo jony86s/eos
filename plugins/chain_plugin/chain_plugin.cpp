@@ -429,6 +429,8 @@ void chain_plugin::set_program_options(options_description& cli, options_descrip
          ("export-reversible-blocks", bpo::value<bfs::path>(),
            "export reversible block database in portable format into specified file and then exit")
          ("snapshot", bpo::value<bfs::path>(), "File to read Snapshot State from")
+         ("blocks-per-session-squash", bpo::value<uint32_t>()->default_value(500u),
+          "Subjectively limit the maximum length of variable components in a variable legnth signature to this size in bytes")
          ;
 
 }
@@ -1182,6 +1184,7 @@ void chain_plugin::plugin_initialize(const variables_map& options) {
       my->account_queries_enabled = options.at("enable-account-queries").as<bool>();
 
       my->chain.emplace( *my->chain_config, std::move(pfs), *chain_id );
+      my->chain->blocks_per_session_squash = options.at("blocks-per-session-squash").as<uint32_t>();
 
       // initialize deep mind logging
       if ( options.at( "deep-mind" ).as<bool>() ) {
