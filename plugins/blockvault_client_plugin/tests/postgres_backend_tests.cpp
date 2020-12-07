@@ -3,6 +3,14 @@
 #include <fc/filesystem.hpp>
 #include <fc/log/appender.hpp>
 
+BOOST_AUTO_TEST_CASE(exception_test) {
+   try {
+      throw pqxx::unique_violation("","");
+   } catch (const pqxx::integrity_constraint_violation&) {
+      printf("exception caught");
+   }
+}
+
 std::vector<char> mock_snapshot_content = {'a', 'b', 'c', 'd', 'e', 'f', 'g', 'h', 'i', 'j', 'k'};
 
 // create a test block_id where the first 4 bytes is block_num and the 5th byte
