@@ -3149,7 +3149,8 @@ namespace eosio {
             return;
          }
       }
-      app().post(priority::medium, [ptr{std::move(ptr)}, id, c = shared_from_this()]() mutable {
+      auto priority = my_impl->sync_master->syncing_with_peer() ? priority::medium : priority::high;
+      app().post(priority, [ptr{std::move(ptr)}, id, c = shared_from_this()]() mutable {
          c->process_signed_block( id, std::move( ptr ) );
       });
    }
