@@ -31,7 +31,9 @@ public:
    [[eosio::action]]
    void notify( eosio::name to, eosio::name expected_sender, bool send_inline );
 
-   [[eosio::on_notify("*::notify")]]
+   // eosio.cdt 1.6.1 has a problem with "*::notify" so hardcode to tester1 for now.
+   // TODO: Change it back to "*::notify" when the bug is fixed in eosio.cdt.
+   [[eosio::on_notify("tester1::notify")]]
    void on_notify( eosio::name to, eosio::name expected_sender, bool send_inline );
 
 };

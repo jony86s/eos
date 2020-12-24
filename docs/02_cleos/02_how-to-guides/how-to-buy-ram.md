@@ -1,6 +1,6 @@
 ## Goal
 
-Acquire RAM for contract deployment, database tables, and other blockchain resources
+Setup an account that require multiple signatures for signning a transaction
 
 ## Before you begin
 

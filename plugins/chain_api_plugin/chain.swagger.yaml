@@ -439,15 +439,9 @@ paths:
                   type: integer
                   description: Limit number of results returned.
                   format: int32
-                  default: 10
                 reverse:
                   type: boolean
                   description: Reverse the order of returned results
-                  default: false
-                show_payer:
-                  type: boolean
-                  description: Show RAM payer
-                  default: false
       responses:
         "200":
           description: OK
@@ -494,25 +488,10 @@ paths:
                   description: Type of key specified by index_position (for example - `uint64_t` or `name`)
                 encode_type:
                   type: string
-                lower_bound:
-                  type: string
-                  description: Filters results to return the first element that is not less than provided value in set
                 upper_bound:
                   type: string
-                  description: Filters results to return the first element that is greater than provided value in set
-                limit:
-                  type: integer
-                  description: Limit number of results returned.
-                  format: int32
-                  default: 10
-                reverse:
-                  type: boolean
-                  description: Reverse the order of returned results
-                  default: false
-                show_payer:
-                  type: boolean
-                  description: Show RAM payer
-                  default: false
+                lower_bound:
+                  type: string
 
       responses:
         "200":
@@ -528,7 +507,7 @@ paths:
 
   /abi_json_to_bin:
     post:
-      description: Returns an object containing the serialized action data.
+      description: Returns an object containing rows from the specified table.
       operationId: abi_json_to_bin
       requestBody:
         content:
@@ -536,17 +515,9 @@ paths:
             schema:
               type: object
               title: AbiJsonToBinRequest
-                - code
-                - action
-                - args
               properties:
-                code:
-                  $ref: "https://eosio.github.io/schemata/v2.0/oas/Name.yaml"
-                action:
-                  $ref: "https://eosio.github.io/schemata/v2.0/oas/Name.yaml"
-                args:
-                  type: object
-                  description: json object of the action parameters that will be serialized.
+                binargs:
+                  $ref: "https://eosio.github.io/schemata/v2.0/oas/Hex.yaml"
 
       responses:
         "200":
@@ -561,7 +532,7 @@ paths:
 
   /abi_bin_to_json:
     post:
-      description: Returns an object containing the deserialized action data.
+      description: Returns an object containing rows from the specified table.
       operationId: abi_bin_to_json
       requestBody:
         content:
@@ -569,10 +540,6 @@ paths:
             schema:
               type: object
               title: AbiBinToJsonRequest
-              required:
-                - code
-                - action
-                - binargs
               properties:
                 code:
                   $ref: "https://eosio.github.io/schemata/v2.0/oas/Name.yaml"
@@ -590,7 +557,7 @@ paths:
 
   /get_code:
     post:
-      description: Returns an object containing the smart contract WASM code.
+      description: Returns an object containing rows from the specified table.
       operationId: get_code
       requestBody:
         content:
@@ -629,7 +596,7 @@ paths:
 
   /get_raw_abi:
     post:
-      description: Returns an object containing the smart contract abi.
+      description: Returns an object containing rows from the specified table.
       operationId: get_raw_abi
       requestBody:
         content:
