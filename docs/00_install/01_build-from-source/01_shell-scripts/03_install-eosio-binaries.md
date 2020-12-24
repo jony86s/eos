@@ -8,7 +8,7 @@ For ease of contract development, content can be installed at the `/usr/local` f
 
 ```sh
 cd ~/eosio/eos
-./scripts/eosio_install.sh
+sudo ./scripts/eosio_install.sh
 ```
 
 ## EOSIO manual install
@@ -17,7 +17,7 @@ In lieu of the `eosio_install.sh` script, you can install the EOSIO binaries dir
 
 ```sh
 cd ~/eosio/eos/build
-make install
+sudo make install
 ```
 
 [[info | What's Next?]]
