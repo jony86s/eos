@@ -18,6 +18,7 @@ You can use `blocks-dir = "blocks"` in the `config.ini` file, or use the `--bloc
 
 ```sh
 nodeos --replay-blockchain \
+  -e -p eosio \
   --plugin eosio::producer_plugin  \
   --plugin eosio::chain_api_plugin \
   --plugin eosio::http_plugin      \
